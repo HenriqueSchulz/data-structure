@@ -4,175 +4,303 @@ import psutil
 import os
 import statistics
 
+from tabulate import tabulate
 from algorithms import HashTable, SearchTree, LinearArray
 from benchmark.CPUMonitor import CPUMonitor
+from data import DataGenerator, Data
 
 
 class Benchmark:
     '''Performs benchmarks on different data structures and algorithms.'''
-    
-    def __init__(self, rounds: int = 5):
+
+    def __init__(self, rounds: int = 5, sizes: list = [100, 200, 400, 800, 1600]):
+
         self.rounds = rounds
+        self.sizes = sizes
+        self.linear_array = None
+        self.search_tree = None
+        self.hash_table = None
 
     @staticmethod
     def get_cpu_cores():
-        print("\nLogical cores:", psutil.cpu_count())
-        print("Physical cores:", psutil.cpu_count(logical=False))
+        rows = [
+            ["Logical cores", psutil.cpu_count()],
+            ["Physical cores", psutil.cpu_count(logical=False)]
+        ]
+        print(tabulate(rows, headers=["Metric", "Value"], tablefmt="grid"))
 
-    def run_search_tree_test(self, balance=True, sizes=[1000, 10000, 100000]):
-        '''Tests insertion performance of SearchTree with or without balancing.'''
-
-        process = psutil.Process(os.getpid())
-
-        print(f"\nTesting insertion on Search Tree {'with' if balance else 'without'} balancing")
-
-        for size in sizes:
-
-            cpu_times = []
-            mem_peaks = []
-            rss_values = []
-            cpu_peaks = []
-
-            print("\n-----------------------------")
-            print(f"Size={size}")
-
-            for r in range(self.rounds):
-
-                tree = SearchTree(balance=balance)
-
-                tracemalloc.start()
-                cpu_start = process.cpu_times()
-
-                monitor = CPUMonitor()
-                monitor.start()
-
-                for _ in range(size):
-                    value = random.randint(1000, 9999)
-                    tree.insert(value)
-
-                cpu_end = process.cpu_times()
-                _, peak = tracemalloc.get_traced_memory()
-                tracemalloc.stop()
-                peak_cpu = monitor.stop()
-
-                cpu_time = (cpu_end.user - cpu_start.user) + (cpu_end.system - cpu_start.system)
-                memory_rss = process.memory_info().rss / (1024 * 1024)
-
-                cpu_times.append(cpu_time)
-                mem_peaks.append(peak / 1024)
-                rss_values.append(memory_rss)
-                cpu_peaks.append(peak_cpu)
-
-                print(f"Round {r+1}: CPU {cpu_time:.4f}s | Mem {peak/1024:.2f}KB | CPU Peak {peak_cpu:.2f}%")
-
-            print("\nResults (mean ± stddev)")
-            print(f"CPU time: {statistics.mean(cpu_times):.4f} ± {statistics.stdev(cpu_times):.4f} s")
-            print(f"Memory Peak (tracemalloc): {statistics.mean(mem_peaks):.2f} ± {statistics.stdev(mem_peaks):.2f} KB")
-            print(f"Memory Process (RSS): {statistics.mean(rss_values):.2f} ± {statistics.stdev(rss_values):.2f} MB")
-            print(f"CPU Peak: {statistics.mean(cpu_peaks):.2f} ± {statistics.stdev(cpu_peaks):.2f}%")
-
-    def run_hash_table_test(self, sizes: list, hash_type: str = 'modular'):
-        '''Tests insertion performance of HashTable.'''
+    def run(self):
 
         process = psutil.Process(os.getpid())
 
-        print("\nTesting HashTable")
+        for size in self.sizes:
 
-        for size in sizes:
+            data = DataGenerator.generate(size)
 
-            cpu_times = []
-            mem_peaks = []
-            rss_values = []
-            cpu_peaks = []
+            rows = []
 
-            print("\n-----------------------------")
-            print(f"Size={size}")
+            # INSERT
+            rows.append(
+                ["LinearArray", "INSERT", *self.linear_array_insert(data, process)]
+            )
 
-            for r in range(self.rounds):
+            rows.append(
+                ["BinaryTree", "INSERT", *self.binary_tree_insert(data, process)]
+            )
 
-                table = HashTable(size=size, hash_type=hash_type)
+            rows.append(
+                ["HashTable", "INSERT", *self.hash_table_insert(data, process)]
+            )
 
-                tracemalloc.start()
-                cpu_start = process.cpu_times()
+            # SEARCH
+            rows.append(
+                ["LinearArray", "SEARCH", *self.linear_array_search(data, process)]
+            )
 
-                monitor = CPUMonitor()
-                monitor.start()
+            rows.append(
+                ["BinaryTree", "SEARCH", *self.binary_tree_search(data, process)]
+            )
 
-                for _ in range(size):
-                    value = random.randint(1000, 9999)
-                    table.insert(value, value)
+            rows.append(
+                ["HashTable", "SEARCH", *self.hash_table_search(data, process)]
+            )
 
-                cpu_end = process.cpu_times()
-                _, peak = tracemalloc.get_traced_memory()
-                tracemalloc.stop()
+            headers = [
+                f"Structure (Size={size})",
+                "Operation",
+                "CPU Time (s)",
+                "Memory Peak (KB)",
+                "CPU Peak (%)",
+                "Avg Iterations"
+            ]
 
-                peak_cpu = monitor.stop()
+            print("\n")
+            print(tabulate(rows, headers=headers, tablefmt="grid"))
 
-                cpu_time = (cpu_end.user - cpu_start.user) + (cpu_end.system - cpu_start.system)
-                memory_rss = process.memory_info().rss / (1024 * 1024)
+    def linear_array_insert(self, data: list[Data], process):
 
-                cpu_times.append(cpu_time)
-                mem_peaks.append(peak / 1024)
-                rss_values.append(memory_rss)
-                cpu_peaks.append(peak_cpu)
+        cpu_times, mem_peaks, cpu_peaks = [], [], []
 
-                print(f"Round {r+1}: CPU {cpu_time:.4f}s | Mem {peak/1024:.2f}KB | CPU Peak {peak_cpu:.2f}%")
+        for _ in range(self.rounds):
 
-            print("\nResults (mean ± stddev)")
-            print(f"CPU time: {statistics.mean(cpu_times):.4f} ± {statistics.stdev(cpu_times):.4f} s")
-            print(f"Memory Peak (tracemalloc): {statistics.mean(mem_peaks):.2f} ± {statistics.stdev(mem_peaks):.2f} KB")
-            print(f"Memory Process (RSS): {statistics.mean(rss_values):.2f} ± {statistics.stdev(rss_values):.2f} MB")
-            print(f"CPU Peak: {statistics.mean(cpu_peaks):.2f} ± {statistics.stdev(cpu_peaks):.2f}%")
-    
-    def run_linear_array_test(self, sizes=[1000, 10000, 100000]):
-        '''Tests insertion performance of LinearArray.'''
+            self.linear_array = LinearArray(len(data))
 
-        process = psutil.Process(os.getpid())
+            tracemalloc.start()
+            cpu_start = process.cpu_times()
 
-        print("\nTesting LinearArray")
+            monitor = CPUMonitor()
+            monitor.start()
 
-        for size in sizes:
+            for d in data:
+                self.linear_array.insert(d)
 
-            cpu_times = []
-            mem_peaks = []
-            rss_values = []
-            cpu_peaks = []
+            cpu_end = process.cpu_times()
+            _, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
 
-            print("\n-----------------------------")
-            print(f"Size={size}")
+            peak_cpu = monitor.stop()
 
-            for r in range(self.rounds):
+            cpu_time = (cpu_end.user - cpu_start.user) + (cpu_end.system - cpu_start.system)
 
-                array = LinearArray(size)
+            cpu_times.append(cpu_time)
+            mem_peaks.append(peak / 1024)
+            cpu_peaks.append(peak_cpu)
 
-                tracemalloc.start()
-                cpu_start = process.cpu_times()
+        return (
+            round(statistics.mean(cpu_times), 6),
+            round(statistics.mean(mem_peaks), 2),
+            round(statistics.mean(cpu_peaks), 2)
+        )
 
-                monitor = CPUMonitor()
-                monitor.start()
+    def binary_tree_insert(self, data: list[Data], process):
 
-                for _ in range(size):
-                    value = random.randint(1000, 9999)
-                    array.insert(value)
+        cpu_times, mem_peaks, cpu_peaks = [], [], []
 
-                cpu_end = process.cpu_times()
-                _, peak = tracemalloc.get_traced_memory()
-                tracemalloc.stop()
+        for _ in range(self.rounds):
 
-                peak_cpu = monitor.stop()
+            self.search_tree = SearchTree()
 
-                cpu_time = (cpu_end.user - cpu_start.user) + (cpu_end.system - cpu_start.system)
-                memory_rss = process.memory_info().rss / (1024 * 1024)
+            tracemalloc.start()
+            cpu_start = process.cpu_times()
 
-                cpu_times.append(cpu_time)
-                mem_peaks.append(peak / 1024)
-                rss_values.append(memory_rss)
-                cpu_peaks.append(peak_cpu)
+            monitor = CPUMonitor()
+            monitor.start()
 
-                print(f"Round {r+1}: CPU {cpu_time:.4f}s | Mem {peak/1024:.2f}KB | CPU Peak {peak_cpu:.2f}%")
+            for d in data:
+                self.search_tree.insert(d)
 
-            print("\nResults (mean ± stddev)")
-            print(f"CPU time: {statistics.mean(cpu_times):.4f} ± {statistics.stdev(cpu_times):.4f} s")
-            print(f"Memory Peak (tracemalloc): {statistics.mean(mem_peaks):.2f} ± {statistics.stdev(mem_peaks):.2f} KB")
-            print(f"Memory Process (RSS): {statistics.mean(rss_values):.2f} ± {statistics.stdev(rss_values):.2f} MB")
-            print(f"CPU Peak: {statistics.mean(cpu_peaks):.2f} ± {statistics.stdev(cpu_peaks):.2f}%")
+            cpu_end = process.cpu_times()
+            _, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+            peak_cpu = monitor.stop()
+
+            cpu_time = (cpu_end.user - cpu_start.user) + (cpu_end.system - cpu_start.system)
+
+            cpu_times.append(cpu_time)
+            mem_peaks.append(peak / 1024)
+            cpu_peaks.append(peak_cpu)
+
+        return (
+            round(statistics.mean(cpu_times), 6),
+            round(statistics.mean(mem_peaks), 2),
+            round(statistics.mean(cpu_peaks), 2)
+        )
+
+    def hash_table_insert(self, data: list[Data], process):
+
+        cpu_times, mem_peaks, cpu_peaks = [], [], []
+
+        for _ in range(self.rounds):
+
+            self.hash_table = HashTable(len(data))
+
+            tracemalloc.start()
+            cpu_start = process.cpu_times()
+
+            monitor = CPUMonitor()
+            monitor.start()
+
+            for d in data:
+                self.hash_table.insert(d)
+
+            cpu_end = process.cpu_times()
+            _, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+            peak_cpu = monitor.stop()
+
+            cpu_time = (cpu_end.user - cpu_start.user) + (cpu_end.system - cpu_start.system)
+
+            cpu_times.append(cpu_time)
+            mem_peaks.append(peak / 1024)
+            cpu_peaks.append(peak_cpu)
+
+        return (
+            round(statistics.mean(cpu_times), 6),
+            round(statistics.mean(mem_peaks), 2),
+            round(statistics.mean(cpu_peaks), 2)
+        )
+
+    def linear_array_search(self, data: list[Data], process):
+
+        cpu_times, mem_peaks, cpu_peaks, iterations = [], [], [], []
+
+        searches = len(data) * 0.01
+
+        for _ in range(self.rounds):
+
+            tracemalloc.start()
+            cpu_start = process.cpu_times()
+
+            monitor = CPUMonitor()
+            monitor.start()
+
+            total_iter = 0
+
+            for _ in range(int(searches)):
+                value = random.choice(data)
+                _, it = self.linear_array.get(value.salary)
+                total_iter += it
+
+            cpu_end = process.cpu_times()
+            _, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+            peak_cpu = monitor.stop()
+
+            cpu_time = (cpu_end.user - cpu_start.user) + (cpu_end.system - cpu_start.system)
+
+            cpu_times.append(cpu_time)
+            mem_peaks.append(peak / 1024)
+            cpu_peaks.append(peak_cpu)
+            iterations.append(total_iter / searches)
+
+        return (
+            round(statistics.mean(cpu_times), 6),
+            round(statistics.mean(mem_peaks), 2),
+            round(statistics.mean(cpu_peaks), 2),
+            round(statistics.mean(iterations), 2)
+        )
+
+    def binary_tree_search(self, data: list[Data], process):
+
+        cpu_times, mem_peaks, cpu_peaks, iterations = [], [], [], []
+
+        searches = len(data) * 0.01
+
+        for _ in range(self.rounds):
+
+            tracemalloc.start()
+            cpu_start = process.cpu_times()
+
+            monitor = CPUMonitor()
+            monitor.start()
+
+            total_iter = 0
+
+            for _ in range(int(searches)):
+                value = random.choice(data)
+                _, it = self.search_tree.get(value.salary)
+                total_iter += it
+
+            cpu_end = process.cpu_times()
+            _, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+            peak_cpu = monitor.stop()
+
+            cpu_time = (cpu_end.user - cpu_start.user) + (cpu_end.system - cpu_start.system)
+
+            cpu_times.append(cpu_time)
+            mem_peaks.append(peak / 1024)
+            cpu_peaks.append(peak_cpu)
+            iterations.append(total_iter / searches)
+
+        return (
+            round(statistics.mean(cpu_times), 6),
+            round(statistics.mean(mem_peaks), 2),
+            round(statistics.mean(cpu_peaks), 2),
+            round(statistics.mean(iterations), 2)
+        )
+
+    def hash_table_search(self, data: list[Data], process):
+
+        cpu_times, mem_peaks, cpu_peaks, iterations = [], [], [], []
+
+        searches = len(data) * 0.01
+
+        for _ in range(self.rounds):
+
+            tracemalloc.start()
+            cpu_start = process.cpu_times()
+
+            monitor = CPUMonitor()
+            monitor.start()
+
+            total_iter = 0
+
+            for _ in range(int(searches)):
+                value = random.choice(data)
+                _, it = self.hash_table.get(value.salary)
+                total_iter += it
+
+            cpu_end = process.cpu_times()
+            _, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+            peak_cpu = monitor.stop()
+
+            cpu_time = (cpu_end.user - cpu_start.user) + (cpu_end.system - cpu_start.system)
+
+            cpu_times.append(cpu_time)
+            mem_peaks.append(peak / 1024)
+            cpu_peaks.append(peak_cpu)
+            iterations.append(total_iter / searches)
+
+        return (
+            round(statistics.mean(cpu_times), 6),
+            round(statistics.mean(mem_peaks), 2),
+            round(statistics.mean(cpu_peaks), 2),
+            round(statistics.mean(iterations), 2)
+        )

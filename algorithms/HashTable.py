@@ -1,10 +1,13 @@
+from data import Data
+
 class HashTable:
     '''Implements a hash table data structure using separate chaining for collision resolution.'''
     
     def __init__(self, size, hash_type='modular'):
         self.size = size
-        self.table = [[] for _ in range(size)]
+        self.table: list[list[Data]] = [[] for _ in range(size)]
         self.hash_type = hash_type
+        self.ocupation = 0
 
         if hash_type not in ['modular', 'multiplicative', 'universal']:
             raise ValueError("Unsupported hash type. Use chose between modular, multiplicative, or universal.")
@@ -25,29 +28,40 @@ class HashTable:
         elif self.hash_type == "universal":
             return ((self.a * key + self.b) % self.p) % self.size
     
-    def insert(self, key, value):
+    def insert(self, value: Data, key=None):
         '''Inserts a key-value pair into the hash table. complexity: O(1) on average, O(n) in worst case due to collisions.'''
-        key = value
+        
+        if key == None:
+            key = value.salary
+
         index = self._hash(key)
 
-        for pair in self.table[index]:
-            if pair[0] == key:
-                pair[1] = value
-                return
-            
+        if not self.table[index]:
+            self.ocupation += 1
+
         self.table[index].append([key, value])
     
     def get(self, key):
-        '''Retrieves the value associated with the given key. complexity: O(1) on average, O(n) in worst case due to collisions.'''
+        '''Searches for a value by key (salary). complexity: O(1) average, O(n) worst case'''
 
         index = self._hash(key)
 
-        for k, v in self.table[index]:
-            if k == key:
-                return v
+        iterations = 0
 
-        return None
+        for k, v in self.table[index]:
+
+            iterations += 1
+
+            if k == key:
+                return v, iterations
+
+        return None, iterations
     
+    def load_factor(self):
+        '''Calculates the load factor of the hash table.'''
+        return self.ocupation / self.size
+
+
     def delete(self, key):
         '''Deletes the key-value pair associated with the given key. complexity: O(1) on average, O(n) in worst case due to collisions.'''
 
@@ -61,5 +75,8 @@ class HashTable:
         return False
 
     def display(self):
+        '''Displays the contents of the hash table.'''
+
         for i, bucket in enumerate(self.table):
             print(f"{i}: {bucket}")
+    

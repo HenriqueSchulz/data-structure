@@ -1,8 +1,10 @@
+from data import Data
+
 class Node:
     '''Node class for Search Tree'''
 
-    def __init__(self, value):
-        self.data = value
+    def __init__(self, value: Data):
+        self.data: Data = value
         self.left: None | SearchTree = None
         self.right: None | SearchTree = None
         self.height = 1
@@ -14,7 +16,7 @@ class SearchTree:
             self.root: Node | None = Node(value) if value is not None else None
             self.balance = balance
 
-    def insert(self, value):
+    def insert(self, value: Data):
         '''Inserts a value into the search tree. complexity: O(log n) on average, O(n) in worst case'''
 
         if self.root is None:
@@ -22,7 +24,7 @@ class SearchTree:
             return
         
         #Insert left
-        if value < self.root.data:
+        if value.salary < self.root.data.salary:
             if self.root.left is None:
                 self.root.left = SearchTree(value)
             else:
@@ -39,6 +41,27 @@ class SearchTree:
         
         if self.balance:
             self._balance()
+
+    def get(self, key):
+        '''Searches for a value by key (salary). complexity: O(log n) average, O(n) worst case'''
+
+        iterations = 0
+        current = self
+
+        while current is not None and current.root is not None:
+
+            iterations += 1
+
+            if key == current.root.data.salary:
+                return current.root.data, iterations
+
+            elif key < current.root.data.salary:
+                current = current.root.left
+
+            else:
+                current = current.root.right
+
+        return None, iterations
 
     def _get_height(self, subtree):
         '''Returns the height of the given subtree. complexity: O(1)'''
