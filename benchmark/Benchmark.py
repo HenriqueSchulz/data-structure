@@ -3,12 +3,13 @@ import tracemalloc
 import psutil
 import os
 import statistics
+import matplotlib.pyplot as plt
 
+from collections import defaultdict
 from tabulate import tabulate
 from algorithms import HashTable, SearchTree, LinearArray
 from benchmark.CPUMonitor import CPUMonitor
 from data import DataGenerator, Data
-
 
 class Benchmark:
     '''Performs benchmarks on different data structures and algorithms.'''
@@ -20,6 +21,11 @@ class Benchmark:
         self.linear_array = None
         self.search_tree = None
         self.hash_table = None
+        self.results = []
+
+        os.makedirs("results", exist_ok=True)
+        os.makedirs("results/insertion", exist_ok=True)
+        os.makedirs("results/search", exist_ok=True)
 
     @staticmethod
     def get_cpu_cores():
@@ -76,6 +82,20 @@ class Benchmark:
 
             print("\n")
             print(tabulate(rows, headers=headers, tablefmt="grid"))
+        
+            for row in rows:
+
+                self.results.append({
+                    "size": size,
+                    "structure": row[0],
+                    "operation": row[1],
+                    "cpu_time": row[2],
+                    "memory": row[3],
+                    "cpu_peak": row[4],
+                    "iterations": row[5] if len(row) > 5 else None
+                })
+
+        self.generate_graphs()
 
     def linear_array_insert(self, data: list[Data], process):
 
@@ -304,3 +324,53 @@ class Benchmark:
             round(statistics.mean(cpu_peaks), 2),
             round(statistics.mean(iterations), 2)
         )
+    
+    def generate_graphs(self):
+
+        metrics = {
+            "cpu_time": "CPU Time (s)",
+            "memory": "Memory Peak (KB)",
+            "cpu_peak": "CPU Peak (%)",
+            "iterations": "Avg Iterations"
+        }
+
+        operations = {
+            "INSERT": "insertion",
+            "SEARCH": "search"
+        }
+
+        for op_key, folder in operations.items():
+
+            op_data = [r for r in self.results if r["operation"] == op_key]
+
+            for metric, label in metrics.items():
+
+                grouped = defaultdict(lambda: defaultdict(list))
+                # structure -> size -> values
+
+                for r in op_data:
+                    if r[metric] is None:
+                        continue
+                    grouped[r["structure"]][r["size"]].append(r[metric])
+
+                plt.figure()
+
+                for structure, sizes_dict in grouped.items():
+
+                    sizes = sorted(sizes_dict.keys())
+                    values = [
+                        sum(sizes_dict[s]) / len(sizes_dict[s])
+                        for s in sizes
+                    ]
+
+                    plt.plot(sizes, values, marker='o', label=structure)
+
+                plt.xlabel("Input Size")
+                plt.ylabel(label)
+                plt.title(f"{label} ({op_key})")
+                plt.legend()
+                plt.grid()
+
+                path = f"results/{folder}/{metric}.png"
+                plt.savefig(path)
+                plt.close()
