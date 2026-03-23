@@ -4,6 +4,7 @@ import psutil
 import os
 import statistics
 import matplotlib.pyplot as plt
+import time  # <-- added
 
 from collections import defaultdict
 from tabulate import tabulate
@@ -20,6 +21,7 @@ class Benchmark:
         self.sizes = sizes
         self.linear_array = None
         self.search_tree = None
+        self.search_tree_unbalanced = None
         self.hash_table = None
         self.results = []
 
@@ -51,7 +53,13 @@ class Benchmark:
             )
 
             rows.append(
-                ["BinaryTree", "INSERT", *self.binary_tree_insert(data, process)]
+                ["BinaryTree (Balanced)", "INSERT",
+                 *self.binary_tree_insert(data, process)]
+            )
+
+            rows.append(
+                ["BinaryTree (Unbalanced)", "INSERT",
+                 *self.binary_tree_insert_unbalanced(data, process)]
             )
 
             rows.append(
@@ -64,7 +72,13 @@ class Benchmark:
             )
 
             rows.append(
-                ["BinaryTree", "SEARCH", *self.binary_tree_search(data, process)]
+                ["BinaryTree (Balanced)", "SEARCH",
+                 *self.binary_tree_search(data, process)]
+            )
+
+            rows.append(
+                ["BinaryTree (Unbalanced)", "SEARCH",
+                 *self.binary_tree_search_unbalanced(data, process)]
             )
 
             rows.append(
@@ -82,9 +96,8 @@ class Benchmark:
 
             print("\n")
             print(tabulate(rows, headers=headers, tablefmt="grid"))
-        
-            for row in rows:
 
+            for row in rows:
                 self.results.append({
                     "size": size,
                     "structure": row[0],
@@ -99,107 +112,154 @@ class Benchmark:
 
     def linear_array_insert(self, data: list[Data], process):
 
-        cpu_times, mem_peaks, cpu_peaks = [], [], []
+        cpu_times, mem_peaks, cpu_peaks, iterations = [], [], [], []
 
         for _ in range(self.rounds):
 
             self.linear_array = LinearArray(len(data))
 
             tracemalloc.start()
-            cpu_start = process.cpu_times()
+            cpu_start = time.perf_counter()
 
             monitor = CPUMonitor()
             monitor.start()
-
+            
+            total_iter = 0
             for d in data:
-                self.linear_array.insert(d)
+                total_iter += self.linear_array.insert(d)
 
-            cpu_end = process.cpu_times()
+            cpu_end = time.perf_counter()
             _, peak = tracemalloc.get_traced_memory()
             tracemalloc.stop()
 
             peak_cpu = monitor.stop()
 
-            cpu_time = (cpu_end.user - cpu_start.user) + (cpu_end.system - cpu_start.system)
+            cpu_time = cpu_end - cpu_start
 
             cpu_times.append(cpu_time)
             mem_peaks.append(peak / 1024)
             cpu_peaks.append(peak_cpu)
+            iterations.append(total_iter / len(data))
 
         return (
             round(statistics.mean(cpu_times), 6),
             round(statistics.mean(mem_peaks), 2),
-            round(statistics.mean(cpu_peaks), 2)
+            round(statistics.mean(cpu_peaks), 2),
+            round(statistics.mean(iterations), 2)
         )
 
     def binary_tree_insert(self, data: list[Data], process):
 
-        cpu_times, mem_peaks, cpu_peaks = [], [], []
+        cpu_times, mem_peaks, cpu_peaks, iterations = [], [], [], []
 
         for _ in range(self.rounds):
 
-            self.search_tree = SearchTree()
+            self.search_tree = SearchTree(balance=True)
 
             tracemalloc.start()
-            cpu_start = process.cpu_times()
+            cpu_start = time.perf_counter()
 
             monitor = CPUMonitor()
             monitor.start()
 
+            total_iter = 0
             for d in data:
-                self.search_tree.insert(d)
+                total_iter += self.search_tree.insert(d)
 
-            cpu_end = process.cpu_times()
+            cpu_end = time.perf_counter()
             _, peak = tracemalloc.get_traced_memory()
             tracemalloc.stop()
 
             peak_cpu = monitor.stop()
 
-            cpu_time = (cpu_end.user - cpu_start.user) + (cpu_end.system - cpu_start.system)
+            cpu_time = cpu_end - cpu_start
 
             cpu_times.append(cpu_time)
             mem_peaks.append(peak / 1024)
             cpu_peaks.append(peak_cpu)
+            iterations.append(total_iter / len(data))
 
         return (
             round(statistics.mean(cpu_times), 6),
             round(statistics.mean(mem_peaks), 2),
-            round(statistics.mean(cpu_peaks), 2)
+            round(statistics.mean(cpu_peaks), 2),
+            round(statistics.mean(iterations), 2)
+        )
+
+    def binary_tree_insert_unbalanced(self, data: list[Data], process):
+
+        cpu_times, mem_peaks, cpu_peaks, iterations = [], [], [], []
+
+        for _ in range(self.rounds):
+
+            self.search_tree_unbalanced = SearchTree(balance=False)
+
+            tracemalloc.start()
+            cpu_start = time.perf_counter()
+
+            monitor = CPUMonitor()
+            monitor.start()
+
+            total_iter = 0
+            for d in data:
+                total_iter += self.search_tree_unbalanced.insert(d)
+
+            cpu_end = time.perf_counter()
+            _, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+            peak_cpu = monitor.stop()
+
+            cpu_time = cpu_end - cpu_start
+
+            cpu_times.append(cpu_time)
+            mem_peaks.append(peak / 1024)
+            cpu_peaks.append(peak_cpu)
+            iterations.append(total_iter / len(data))
+
+        return (
+            round(statistics.mean(cpu_times), 6),
+            round(statistics.mean(mem_peaks), 2),
+            round(statistics.mean(cpu_peaks), 2),
+            round(statistics.mean(iterations), 2)
         )
 
     def hash_table_insert(self, data: list[Data], process):
 
-        cpu_times, mem_peaks, cpu_peaks = [], [], []
+        cpu_times, mem_peaks, cpu_peaks, iterations = [], [], [], []
 
         for _ in range(self.rounds):
 
-            self.hash_table = HashTable(len(data))
+            self.hash_table = HashTable(len(data)//2)
 
             tracemalloc.start()
-            cpu_start = process.cpu_times()
+            cpu_start = time.perf_counter()
 
             monitor = CPUMonitor()
             monitor.start()
 
+            total_iter = 0
             for d in data:
-                self.hash_table.insert(d)
-
-            cpu_end = process.cpu_times()
+                total_iter += self.hash_table.insert(d)
+            
+            cpu_end = time.perf_counter()
             _, peak = tracemalloc.get_traced_memory()
             tracemalloc.stop()
 
             peak_cpu = monitor.stop()
 
-            cpu_time = (cpu_end.user - cpu_start.user) + (cpu_end.system - cpu_start.system)
+            cpu_time = cpu_end - cpu_start
 
             cpu_times.append(cpu_time)
             mem_peaks.append(peak / 1024)
             cpu_peaks.append(peak_cpu)
+            iterations.append(total_iter / len(data))
 
         return (
             round(statistics.mean(cpu_times), 6),
             round(statistics.mean(mem_peaks), 2),
-            round(statistics.mean(cpu_peaks), 2)
+            round(statistics.mean(cpu_peaks), 2),
+            round(statistics.mean(iterations), 2)
         )
 
     def linear_array_search(self, data: list[Data], process):
@@ -211,7 +271,7 @@ class Benchmark:
         for _ in range(self.rounds):
 
             tracemalloc.start()
-            cpu_start = process.cpu_times()
+            cpu_start = time.perf_counter()
 
             monitor = CPUMonitor()
             monitor.start()
@@ -223,13 +283,13 @@ class Benchmark:
                 _, it = self.linear_array.get(value.salary)
                 total_iter += it
 
-            cpu_end = process.cpu_times()
+            cpu_end = time.perf_counter()
             _, peak = tracemalloc.get_traced_memory()
             tracemalloc.stop()
 
             peak_cpu = monitor.stop()
 
-            cpu_time = (cpu_end.user - cpu_start.user) + (cpu_end.system - cpu_start.system)
+            cpu_time = cpu_end - cpu_start
 
             cpu_times.append(cpu_time)
             mem_peaks.append(peak / 1024)
@@ -252,7 +312,7 @@ class Benchmark:
         for _ in range(self.rounds):
 
             tracemalloc.start()
-            cpu_start = process.cpu_times()
+            cpu_start = time.perf_counter()
 
             monitor = CPUMonitor()
             monitor.start()
@@ -264,13 +324,54 @@ class Benchmark:
                 _, it = self.search_tree.get(value.salary)
                 total_iter += it
 
-            cpu_end = process.cpu_times()
+            cpu_end = time.perf_counter()
             _, peak = tracemalloc.get_traced_memory()
             tracemalloc.stop()
 
             peak_cpu = monitor.stop()
 
-            cpu_time = (cpu_end.user - cpu_start.user) + (cpu_end.system - cpu_start.system)
+            cpu_time = cpu_end - cpu_start
+
+            cpu_times.append(cpu_time)
+            mem_peaks.append(peak / 1024)
+            cpu_peaks.append(peak_cpu)
+            iterations.append(total_iter / searches)
+
+        return (
+            round(statistics.mean(cpu_times), 6),
+            round(statistics.mean(mem_peaks), 2),
+            round(statistics.mean(cpu_peaks), 2),
+            round(statistics.mean(iterations), 2)
+        )
+
+    def binary_tree_search_unbalanced(self, data: list[Data], process):
+
+        cpu_times, mem_peaks, cpu_peaks, iterations = [], [], [], []
+
+        searches = len(data) * 0.01
+
+        for _ in range(self.rounds):
+
+            tracemalloc.start()
+            cpu_start = time.perf_counter()
+
+            monitor = CPUMonitor()
+            monitor.start()
+
+            total_iter = 0
+
+            for _ in range(int(searches)):
+                value = random.choice(data)
+                _, it = self.search_tree_unbalanced.get(value.salary)
+                total_iter += it
+
+            cpu_end = time.perf_counter()
+            _, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+            peak_cpu = monitor.stop()
+
+            cpu_time = cpu_end - cpu_start
 
             cpu_times.append(cpu_time)
             mem_peaks.append(peak / 1024)
@@ -293,7 +394,7 @@ class Benchmark:
         for _ in range(self.rounds):
 
             tracemalloc.start()
-            cpu_start = process.cpu_times()
+            cpu_start = time.perf_counter()
 
             monitor = CPUMonitor()
             monitor.start()
@@ -305,13 +406,13 @@ class Benchmark:
                 _, it = self.hash_table.get(value.salary)
                 total_iter += it
 
-            cpu_end = process.cpu_times()
+            cpu_end = time.perf_counter()
             _, peak = tracemalloc.get_traced_memory()
             tracemalloc.stop()
 
             peak_cpu = monitor.stop()
 
-            cpu_time = (cpu_end.user - cpu_start.user) + (cpu_end.system - cpu_start.system)
+            cpu_time = cpu_end - cpu_start
 
             cpu_times.append(cpu_time)
             mem_peaks.append(peak / 1024)
@@ -324,7 +425,7 @@ class Benchmark:
             round(statistics.mean(cpu_peaks), 2),
             round(statistics.mean(iterations), 2)
         )
-    
+
     def generate_graphs(self):
 
         metrics = {
@@ -346,7 +447,6 @@ class Benchmark:
             for metric, label in metrics.items():
 
                 grouped = defaultdict(lambda: defaultdict(list))
-                # structure -> size -> values
 
                 for r in op_data:
                     if r[metric] is None:

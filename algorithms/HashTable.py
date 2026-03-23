@@ -29,17 +29,34 @@ class HashTable:
             return ((self.a * key + self.b) % self.p) % self.size
     
     def insert(self, value: Data, key=None):
-        '''Inserts a key-value pair into the hash table. complexity: O(1) on average, O(n) in worst case due to collisions.'''
-        
-        if key == None:
+        '''Inserts a key-value pair into the hash table. 
+        Average: O(1), Worst-case: O(n) due to collisions.'''
+
+        iterations = 1
+
+        if key is None:
             key = value.salary
 
         index = self._hash(key)
+        bucket = self.table[index]
 
-        if not self.table[index]:
+        if not bucket:
+            self.table[index] = [[key, value]]
             self.ocupation += 1
+            return iterations
 
-        self.table[index].append([key, value])
+        # Handle collision: check if key already exists
+        for i, (k, v) in enumerate(bucket):
+            iterations += 1
+            if k == key:
+                # Update existing value
+                bucket[i][1] = value
+                return iterations
+
+        # If key does not exist, append new pair
+        bucket.append([key, value])
+
+        return iterations
     
     def get(self, key):
         '''Searches for a value by key (salary). complexity: O(1) average, O(n) worst case'''

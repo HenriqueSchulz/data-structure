@@ -17,6 +17,9 @@ class LinearArray:
         self.array[self.occupation] = value
         self.occupation += 1
 
+        iterations = 1
+        return iterations   
+
     def delete(self, index):
         '''Deletes the value at the specified index. complexity: O(n)'''
 
