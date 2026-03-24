@@ -1,5 +1,6 @@
 from data import Data
 
+
 class HashTable:
     '''Implements a hash table data structure using separate chaining for collision resolution.'''
     
@@ -8,14 +9,15 @@ class HashTable:
         self.table: list[list[Data]] = [[] for _ in range(size)]
         self.hash_type = hash_type
         self.ocupation = 0
+        self.collisions = 0  # NEW: collision counter
 
         if hash_type not in ['modular', 'multiplicative', 'universal']:
             raise ValueError("Unsupported hash type. Use chose between modular, multiplicative, or universal.")
         
-        self.A = 0.6180339887  # Knuth's constant for multiplicative hashing
-        self.p = 109345121     # A large prime for universal hashing
-        self.a = 31415         # Randomly chosen for universal hashing
-        self.b = 27183         # Randomly chosen for universal hashing
+        self.A = 0.6180339887
+        self.p = 109345121
+        self.a = 31415
+        self.b = 27183
 
     def _hash(self, key):
         
@@ -29,8 +31,11 @@ class HashTable:
             return ((self.a * key + self.b) % self.p) % self.size
     
     def insert(self, value: Data, key=None):
-        '''Inserts a key-value pair into the hash table. 
-        Average: O(1), Worst-case: O(n) due to collisions.'''
+        '''
+        Inserts a key-value pair into the hash table.
+        Average: O(1), Worst-case: O(n) due to collisions.
+        Also tracks collisions.
+        '''
 
         iterations = 1
 
@@ -38,23 +43,16 @@ class HashTable:
             key = value.salary
 
         index = self._hash(key)
-        bucket = self.table[index]
 
-        if not bucket:
-            self.table[index] = [[key, value]]
+        if len(self.table[index]) > 0:
+            self.collisions += 1
+
+        # Insert (separate chaining)
+        self.table[index].append([key, value])
+
+        # Track occupation
+        if len(self.table[index]) == 1:
             self.ocupation += 1
-            return iterations
-
-        # Handle collision: check if key already exists
-        for i, (k, v) in enumerate(bucket):
-            iterations += 1
-            if k == key:
-                # Update existing value
-                bucket[i][1] = value
-                return iterations
-
-        # If key does not exist, append new pair
-        bucket.append([key, value])
 
         return iterations
     
@@ -78,9 +76,12 @@ class HashTable:
         '''Calculates the load factor of the hash table.'''
         return self.ocupation / self.size
 
+    def get_collisions(self):
+        '''Returns total number of collisions occurred during insertions.'''
+        return self.collisions
 
     def delete(self, key):
-        '''Deletes the key-value pair associated with the given key. complexity: O(1) on average, O(n) in worst case due to collisions.'''
+        '''Deletes the key-value pair associated with the given key.'''
 
         index = self._hash(key)
 
@@ -96,4 +97,3 @@ class HashTable:
 
         for i, bucket in enumerate(self.table):
             print(f"{i}: {bucket}")
-    

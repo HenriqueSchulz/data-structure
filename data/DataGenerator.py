@@ -17,7 +17,7 @@ class DataGenerator:
 
             experience = max(0, age - 18 - random.randint(0, 5))
 
-            # salário correlacionado com experiência
+            # Salary is based on experience with some randomness, ensuring a minimum salary of 1200
             salary = int(random.gauss(3000 + experience * 500, 1500))
             salary = max(1200, salary)
 
