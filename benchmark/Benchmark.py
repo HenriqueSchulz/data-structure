@@ -46,19 +46,19 @@ class Benchmark:
             },
             {
                 "name": "HashTable (Modular)",
-                "factory": lambda size: HashTable(int(20000 + size * 0.1), "modular"),
+                "factory": lambda size: HashTable(30000, "modular"),
                 "insert": lambda ds, d: ds.insert(d),
                 "search": lambda ds, d: ds.get(d.salary),
             },
             {
                 "name": "HashTable (Multiplicative)",
-                "factory": lambda size: HashTable(int(20000 + size * 0.1), "multiplicative"),
+                "factory": lambda size: HashTable(30000, "multiplicative"),
                 "insert": lambda ds, d: ds.insert(d),
                 "search": lambda ds, d: ds.get(d.salary),
             },
             {
                 "name": "HashTable (Universal)",
-                "factory": lambda size: HashTable(int(20000 + size * 0.1), "universal"),
+                "factory": lambda size: HashTable(30000, "universal"),
                 "insert": lambda ds, d: ds.insert(d),
                 "search": lambda ds, d: ds.get(d.salary),
             },
@@ -70,11 +70,8 @@ class Benchmark:
 
     def run(self):
 
-        process = psutil.Process(os.getpid())
-
         for size in self.sizes:
 
-            # Dataset gerado uma única vez (fair benchmark)
             data = DataGenerator.generate(size)
 
             rows = []
@@ -87,7 +84,6 @@ class Benchmark:
                 rows.append([test["name"], "INSERT", *insert_result])
                 rows.append([test["name"], "SEARCH", *search_result])
 
-                # INSERT
                 self.results.append({
                     "size": size,
                     "structure": test["name"],
@@ -100,7 +96,6 @@ class Benchmark:
                     "load_factor": extra.get("load_factor")
                 })
 
-                # SEARCH
                 self.results.append({
                     "size": size,
                     "structure": test["name"],
@@ -184,7 +179,7 @@ class Benchmark:
 
         cpu_times, mem_peaks, cpu_peaks, iterations = [], [], [], []
 
-        searches = int(len(data) * 0.01)
+        searches = int(len(data) * 0.1)
 
         for _ in range(self.rounds):
 
@@ -266,6 +261,9 @@ class Benchmark:
                 if not grouped:
                     continue
 
+                # -----------------------------
+                # NORMAL GRAPH (ALL STRUCTURES)
+                # -----------------------------
                 plt.figure()
 
                 for structure, sizes_dict in grouped.items():
@@ -289,3 +287,37 @@ class Benchmark:
 
                 plt.savefig(path)
                 plt.close()
+
+                # -------------------------------------------------
+                # EXTRA GRAPH (WITHOUT LinearArray - ONLY GENERAL SEARCH)
+                # -------------------------------------------------
+                if (
+                    base_path == "results/general"
+                    and op_key == "SEARCH"
+                    and metric in ["cpu_time", "iterations"]
+                ):
+
+                    plt.figure()
+
+                    for structure, sizes_dict in grouped.items():
+
+                        if structure == "LinearArray":
+                            continue
+
+                        sizes = sorted(sizes_dict.keys())
+                        values = [
+                            sum(sizes_dict[s]) / len(sizes_dict[s])
+                            for s in sizes
+                        ]
+
+                        plt.plot(sizes, values, marker='o', label=structure)
+
+                    plt.xlabel("Input Size")
+                    plt.ylabel(label)
+                    plt.title(f"{label} ({op_key}) - Without LinearArray")
+                    plt.legend()
+                    plt.grid()
+
+                    path = f"{base_path}/{folder}/{metric}_no_linear.png"
+                    plt.savefig(path)
+                    plt.close()
