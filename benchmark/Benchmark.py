@@ -224,20 +224,24 @@ class Benchmark:
     def _generate_group(self, filter_fn, base_path):
 
         metrics = {
-            "cpu_time": "CPU Time (s)",
-            "memory": "Memory Peak (KB)",
-            "cpu_peak": "CPU Peak (%)",
-            "iterations": "Avg Iterations"
+            "cpu_time": "Tempo de CPU (s)",
+            "memory": "Pico de Memória (KB)",
+            "cpu_peak": "Pico de CPU (%)",
+            "iterations": "Média de Iterações"
         }
 
         if "hash_table" in base_path:
-            metrics["collisions"] = "Collisions"
-            metrics["load_factor"] = "Load Factor"
+            metrics["collisions"] = "Colisões"
+            metrics["load_factor"] = "Fator de Carga"
 
         operations = {
             "INSERT": "insertion",
             "SEARCH": "search"
         }
+
+        # estilos para evitar sobreposição visual
+        line_styles = ['-', '--', '-.', ':']
+        markers = ['o', 's', '^', 'D', 'x', '*']
 
         for op_key, folder in operations.items():
 
@@ -261,12 +265,9 @@ class Benchmark:
                 if not grouped:
                     continue
 
-                # -----------------------------
-                # NORMAL GRAPH (ALL STRUCTURES)
-                # -----------------------------
-                plt.figure()
+                plt.figure(figsize=(10, 6))
 
-                for structure, sizes_dict in grouped.items():
+                for i, (structure, sizes_dict) in enumerate(grouped.items()):
 
                     sizes = sorted(sizes_dict.keys())
                     values = [
@@ -274,32 +275,47 @@ class Benchmark:
                         for s in sizes
                     ]
 
-                    plt.plot(sizes, values, marker='o', label=structure)
+                    plt.plot(
+                        sizes,
+                        values,
+                        marker=markers[i % len(markers)],
+                        linestyle=line_styles[i % len(line_styles)],
+                        linewidth=2,
+                        markersize=6,
+                        alpha=0.85,
+                        label=structure
+                    )
 
-                plt.xlabel("Input Size")
+                plt.xlabel("Tamanho da Entrada")
                 plt.ylabel(label)
-                plt.title(f"{label} ({op_key})")
-                plt.legend()
-                plt.grid()
+                plt.title(f"{label} - Operação: {'Inserção' if op_key == 'INSERT' else 'Busca'}")
+
+                # legenda fora do gráfico (evita sobreposição)
+                plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+
+                plt.grid(alpha=0.3)
+
+                # escala log ajuda quando valores são muito diferentes
+                if metric in ["cpu_time", "iterations"]:
+                    plt.yscale("log")
 
                 path = f"{base_path}/{folder}/{metric}.png"
                 os.makedirs(os.path.dirname(path), exist_ok=True)
 
+                plt.tight_layout()
                 plt.savefig(path)
                 plt.close()
 
-                # -------------------------------------------------
-                # EXTRA GRAPH (WITHOUT LinearArray - ONLY GENERAL SEARCH)
-                # -------------------------------------------------
+                # EXTRA GRAPH
                 if (
                     base_path == "results/general"
                     and op_key == "SEARCH"
                     and metric in ["cpu_time", "iterations"]
                 ):
 
-                    plt.figure()
+                    plt.figure(figsize=(10, 6))
 
-                    for structure, sizes_dict in grouped.items():
+                    for i, (structure, sizes_dict) in enumerate(grouped.items()):
 
                         if structure == "LinearArray":
                             continue
@@ -310,14 +326,28 @@ class Benchmark:
                             for s in sizes
                         ]
 
-                        plt.plot(sizes, values, marker='o', label=structure)
+                        plt.plot(
+                            sizes,
+                            values,
+                            marker=markers[i % len(markers)],
+                            linestyle=line_styles[i % len(line_styles)],
+                            linewidth=2,
+                            markersize=6,
+                            alpha=0.85,
+                            label=structure
+                        )
 
-                    plt.xlabel("Input Size")
+                    plt.xlabel("Tamanho da Entrada")
                     plt.ylabel(label)
-                    plt.title(f"{label} ({op_key}) - Without LinearArray")
-                    plt.legend()
-                    plt.grid()
+                    plt.title(f"{label} - Busca (sem LinearArray)")
+
+                    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+                    plt.grid(alpha=0.3)
+
+                    plt.yscale("log")
 
                     path = f"{base_path}/{folder}/{metric}_no_linear.png"
+
+                    plt.tight_layout()
                     plt.savefig(path)
                     plt.close()
