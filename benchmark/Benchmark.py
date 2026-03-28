@@ -295,10 +295,6 @@ class Benchmark:
 
                 plt.grid(alpha=0.3)
 
-                # escala log ajuda quando valores são muito diferentes
-                if metric in ["cpu_time", "iterations"]:
-                    plt.yscale("log")
-
                 path = f"{base_path}/{folder}/{metric}.png"
                 os.makedirs(os.path.dirname(path), exist_ok=True)
 
@@ -343,8 +339,6 @@ class Benchmark:
 
                     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
                     plt.grid(alpha=0.3)
-
-                    plt.yscale("log")
 
                     path = f"{base_path}/{folder}/{metric}_no_linear.png"
 
